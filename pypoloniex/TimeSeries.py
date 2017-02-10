@@ -4,6 +4,7 @@ import json
 import requests
 import datetime as dt
 import pandas as pd
+import math
 
 def toUnix(stringdate):
 	date = dt.datetime.strptime(stringdate, "%d/%m/%Y")
@@ -34,9 +35,9 @@ def validDates(start, end):
 	if (start > end):
 		print("Date Error: Start date must come before end date.")
 		return False
-	if (end-start).days > 365:
-		print("Date Error: The time period must be less than a year.")
-		return False
+	#if (end-start).days > 365:
+		#print("Date Error: The time period must be less than a year.")
+		#return False
 	return True
 
 def buildURL(pair, period, start, end):
@@ -75,28 +76,36 @@ class TimeSeries(object):
 		
 		if not validDates(start, end):
 			return
-
-		url = buildURL(pair, period, start, end)
-		datapoints = requests.get(url)
-		datapoints = datapoints.json()
-
+		
+		#set up attributes
 		fields = ['date', 'open', 'low', 'high', 'close', 'weightedAverage', 'volume', 'quoteVolume']
 		data = []
-		for dtp in datapoints:
-			row = []
-			for fld in fields:			
-				if fld == 'date':
-					row.append(toDate(dtp[fld]))
-				else:
-					row.append(dtp[fld])
-			data.append(row)
-		
-		self.data = pd.DataFrame(data, columns = fields)
 		self.empty = False
 		self.pair = pair
 		self.period = period
 		self.start = start
 		self.end = end
+		
+		#repeat data grabbing process for each year
+		tempstart = dt.datetime.strptime(start, "%d/%m/%Y")
+		tempend = dt.datetime.strptime(end, "%d/%m/%Y")
+		numYear=math.ceil((tempend-tempstart).days/365)
+		for year in range(numYear):
+			url = buildURL(pair, period, start, end)
+			datapoints = requests.get(url)
+			datapoints = datapoints.json()
+			
+			for dtp in datapoints:
+				row = []
+				for fld in fields:			
+					if fld == 'date':
+						row.append(toDate(dtp[fld]))
+					else:
+						row.append(dtp[fld])
+				data.append(row)
+		
+		self.data = pd.DataFrame(data, columns = fields)
+		
 
 	def toCSV(self, filename, sep = ','):
 		if self.empty:
